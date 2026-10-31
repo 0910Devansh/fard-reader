@@ -132,10 +132,18 @@ function findGrid(img) {
   const unit = (xs[8] - xs[0]) / TABLE_W;
   const below = hl.slice(2).filter(q => 60 * unit < q[0] - last(hl[1]) && q[0] - last(hl[1]) < 170 * unit);
   const top = below.length ? last(below[0]) + 3 : last(hl[1]) + 3;
+  const onAt = y => { for (let x = xs[0]; x < xs[0] + 3; x++) if (dark[y * w + x]) return true; return false; };
   let y = top, gap = 0;
-  while (y < h && gap <= 5) {
-    let on = false; for (let x = xs[0]; x < xs[0] + 3; x++) if (dark[y * w + x]) { on = true; break; }
-    gap = on ? 0 : gap + 1; y++;
+  while (y < h) {
+    gap = onAt(y) ? 0 : gap + 1; y++;
+    if (gap <= 5) continue;
+    // the table can stop and start again lower down: a line such as 'Error: Subreport could not be shown.' printed
+    // between two tables. Carry on only if the left border starts again within ~30 pt and runs on as a line (>= 15 pt)
+    let r = y; const maxGap = Math.round(60 * unit), minRun = Math.round(30 * unit);   // unit = 1/1813 of the table width (about 0.5 pt)
+    while (r < Math.min(h, y + maxGap) && !onAt(r)) r++;
+    let run = 0; while (r + run < h && run < minRun && onAt(r + run)) run++;
+    if (run < minRun) break;
+    y = r; gap = 0;
   }
   return { x: xs, top, bottom: y - gap - 2, tableTop: hl[0][0] };
 }
@@ -473,6 +481,9 @@ async function scanPage(pg, { img, grid, words, hiImg, bigha }) {
   for (const [y, t] of col1Text) {
     if (!HDR.test(t) || redIn(y)) continue;
     const above = col1Text.filter(([yy]) => yy < y && yy >= y - 40).pop();
+    // a list of old numbers can run down the cell ('203/' '189/' '1,' '199' 'ਮਿਨ,' '189/' '21'): a line under one that
+    // ends in a comma continues that list, it is not a new khewat
+    if (above && /,\s*$/.test(above[1])) continue;
     // '542/' then '505/' then '1': the second line is the old number of the same khewat, not a new one
     if (above && HDR.test(above[1])) {
       // '194/ 180' then '1/': the header already carries its old number, so a short 'N/' below is a sub-number (194/1)
@@ -837,6 +848,16 @@ function build(events, scannedPages = new Set()) {
     if (kind === 'unit') { bighaPages.add(pg); continue; }
     if (kind === 'khewat') {
       const prev = cur;
+      // a khewat's heading row can start at the very bottom of a page and go on at the top of the next ('723/' on page 1,
+      // then '651 ਮਿਨ' and the owners on page 2). The number at the top is then its old number, not a new khewat: it is
+      // lower (khewats are printed in rising order), the khewat above has no total, and no share has been read for it yet
+      const pn = prev ? parseInt(prev.no, 10) : 0, vn = parseInt(val, 10);
+      if (prev && !prev.totalSeen && !prev.oldNo && !/\//.test(String(prev.no)) && Math.min(...prev.pages) === pg - 1 &&
+          Math.max(...prev.pages) <= pg && !prev.lines.some(([, t]) => /\d+\s*\/\s*\d+/.test(t)) && pn > 0 && vn > 0 && vn < pn) {
+        prev.oldNo = String(val); prev.oldFromNextPage = true; prev.pages.add(pg);
+        prev.numberNote = `khewat ${prev.no} is printed at the bottom of page ${pg - 1} and goes on at the top of page ${pg}, where its old number ${val} is printed - check page ${pg - 1}`;
+        continue;
+      }
       cur = { no: val, pages: new Set([pg]), khatauni: [], lines: [], total: null, totalPage: null, totalSeen: false,
               mutationPages: new Set(), mortgagePages: new Set(), ktotals: [], totalFromSum: false, khasras: [], kitte: 0, lastMur: null, totalNote: '' };
       // downloaded Fards only (exact text): carry name lines that look like a name; never on scans, where OCR noise could be carried
@@ -854,7 +875,11 @@ function build(events, scannedPages = new Set()) {
       khewats.push(cur); continue;
     }
     if (!cur) continue;
-    if (kind === 'khewat_old') { if (!cur.oldNo) cur.oldNo = val; continue; }
+    if (kind === 'khewat_old') {
+      if (cur.oldFromNextPage) { cur.oldNo += (/^\d/.test(val) ? '/' : ' ') + val; cur.oldFromNextPage = false; }   // '651' + 'ਮਿਨ'
+      else if (!cur.oldNo) cur.oldNo = val;
+      continue;
+    }
     const carry = () => (cur.carry = cur.carry || { lines: [], khat: [], khas: [], kitte: 0, pg, pages: new Set() }, cur.carry.pg = pg, cur.carry.pages.add(pg), cur.carry);
     if (cur.totalSeen && (kind === 'khatauni' || kind === 'owner_line' || kind === 'khasra_line' || kind === 'kitte')) {
       const c = carry();

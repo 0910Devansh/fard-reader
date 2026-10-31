@@ -160,3 +160,18 @@ Fards; owners and shares are read exactly as in 20.5.
 - **A stray "q" in the PDF's text** ("ਰਕਬਾ q 149 ਕਨਾਲ") no longer stops the total from being read.
 - Where the Fard's own hectare figure does not match its Kanal-Marla total (this happens in some Fards), the total is
   shown as printed and the khewat is marked to check with a patwari, as before.
+
+## Version 20.7
+
+Found by checking about 4,200 khewats from 600 Land Records against what is printed in each Fard. Three cases where a
+khewat could be split, merged into another or missed; every other khewat gives exactly the same result as in 20.6.
+
+- **A list of old khewat numbers is read as one heading.** Some khewats list several old numbers down the first column
+  ("203/" then "189/1, 199 ਮਿਨ, 189/21"). 20.6 read the last line as a new khewat "189/21", so khewat 203 lost its total
+  and a khewat with no owners appeared. It now stays one khewat with its total.
+- **A khewat after a break in the table is no longer missed.** When the Fard prints "Error: Subreport could not be shown."
+  between two tables on a page, 20.6 stopped reading at that line and the khewat below it was left out completely, with
+  all its owners. It is now read.
+- **A khewat heading split over two pages is joined.** When a khewat number is printed at the very bottom of a page
+  ("723/") and its old number and owners at the top of the next ("651 ਮਿਨ ..."), 20.6 showed an empty khewat 723 and a
+  wrong khewat 651. It is now one khewat, 723/651, with a note to check the page.

@@ -5,7 +5,7 @@ owner in English (with the Punjabi name under it), their share, their land in ac
 (as printed: new / old number), its khatauni and khasra numbers, and the page each one is on. Nothing is uploaded:
 the PDF is read in the browser.
 
-Current version: **20.6**.
+Current version: **20.7**.
 
 ## How it works
 
@@ -26,7 +26,8 @@ notes for every version.
 
 ## Accuracy
 
-Version 20.6 was checked against about 2,200 khewats from roughly 330 downloaded Land Records: every khewat total and
-owner share was compared with what is printed in the Fard. About 80% of khewats are confirmed exactly, about 9% are
-issues in the Fard itself (shares that do not add up, a wrong hectare figure, a cut-off PDF), about 1% are still open
-for review, and the rest are scanned copies, where only the app's own checks apply.
+Version 20.7 was checked against about 4,900 khewats from over 700 downloaded Land Records: every khewat total and
+owner share was compared with what is printed in the Fard. About 87% of khewats are confirmed exactly (91% of the
+digital Fards), about 8% are issues in the Fard itself (shares that do not add up, a wrong hectare figure, a part the
+site could not print, a cut-off PDF), 0.4% are still open for review, and the rest are scanned copies, where only the
+app's own checks apply.

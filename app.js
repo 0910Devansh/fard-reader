@@ -5,7 +5,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // offline: the service worker stores every file on the phone; say so once it is done
-const VERSION = '20.6';
+const VERSION = '20.7';
 let reading = false;
 if ('serviceWorker' in navigator) {
   // a newer version was installed while this page was open: offer to switch (never in the middle of reading)
