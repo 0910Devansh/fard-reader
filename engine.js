@@ -246,7 +246,7 @@ async function loadPage(pdf, n) {
 const STRIP = s => s.replace(/^[ ._\-!|'"]+|[ ._\-!|'"]+$/g, '');
 const FRAC = /(\d+)\s*\/\s*(\d+)/;
 // 'ਰਕਬਾ N ਕਨਾਲ N ਮਰਲਾ' - first letter may be misread (ਚਕਬਾ), so anchor on ...ਕਬਾ
-const TOTAL = /\S?ਕਬਾ\s*(?:q\s*)?(\d+)\s*ਕਨਾਲ\s*(\d+)\s*ਮਰਲਾ/;      // some text layers have a stray 'q' glyph: 'ਰਕਬਾ q 149 ਕਨਾਲ'
+const TOTAL = /\S?ਕਬਾ\s*(?:q\s*)?(\d+)\s*ਕਨਾਲ\s*(\d+)\s*ਮਰਲਾ(?:\s*(\d+(?:\.\d+)?)\s*ਬਿਸਵਾਂਸੀ)?/;      // some text layers have a stray 'q' glyph: 'ਰਕਬਾ q 149 ਕਨਾਲ'
 // the word ਰਕਬਾ itself (first letter may be misread) - not names like ਗੁਰਇਕਬਾਲ; a totals row also says ਕਨਾਲ/ਮਰਲਾ
 const RAKBA = /(?:^|\s)\S?ਕਬਾ(?=\s|\d|$)[^]*(?:ਕਨਾਲ|ਮਰਲਾ)/;
 // khewat header = first line under a rule in column 1: '25/ 18', '25 18' (slash lost) or '25'
@@ -322,25 +322,29 @@ const M2_PER_MARLA = 25.29285;                       // 1 kanal = 20 marla = 505
 const M2_PER_BISWA = M2_PER_MARLA * 5 / 3;
 let unitM2 = M2_PER_MARLA;
 const agrees = (marla, m2) => Math.abs(marla * unitM2 - m2) <= 1 + m2 * 1e-4;
-const BIGHA = /(?:ਬਿ|ਸਬ|ਬ)[ਗਘ]ਾ/g, BISWA = /(?:ਬਿ|ਸਬ|ਬ)ਸ?ਵਾ(?=\s|$|\))/g;   // ਬਿਗਾ / ਬਿਸਵਾ (text layers: ਸਬਗਾ / ਸਬਸਵਾ)
+const BIGHA = /(?:ਬਿ|ਸਬ|ਬ)[ਗਘ]ਾ/g, BISWA = /(?:ਬਿ|ਸਬ|ਬ)ਿ?ਸ?ਵਾ(?=\s|$|\))/g;   // ਬਿਗਾ / ਬਿਸਵਾ (text layers: ਸਬਗਾ / ਸਬਸਵਾ / ਸਬਿਵਾ)
+// some bigha Fards add biswansi (1 biswa = 20 biswansi): '62 ਬਿਘਾ 6 ਬਿਸਵਾ 10.00 ਬਿਸਵਾਂਸੀ' (text layers: ਸਬਿਵਾਿੀ)
+const BISWANSI = /(?:ਬਿ|ਸਬ|ਬ)ਿ?ਸ?ਵਾ\S{0,2}ੀ/g, BSI = 'ਬਿਸਵਾਂਸੀ';
 const isBigha = t => /\d\s*(?:ਬਿ|ਸਬ|ਬ)[ਗਘ]ਾ\s*\d/.test(t);
-const toKanal = t => t.replace(BIGHA, 'ਕਨਾਲ').replace(BISWA, 'ਮਰਲਾ');
+const toKanal = t => t.replace(BISWANSI, BSI).replace(BIGHA, 'ਕਨਾਲ').replace(BISWA, 'ਮਰਲਾ');
+const bsi = v => v === undefined ? 0 : parseFloat(v) / 20;           // biswansi -> biswa (read as marla)
 // 'ਰਕਬਾ 38 ਕਨਾਲ 8 ਮਰਲਾ (1 ਹੈਕਟੇਅਰ 94 ਏਅਰ 24.91 ...' -> [kanal, marla, m2 or null]
 const TOTAL_HA = /\S?ਕਬਾ\s*(\d+)\s*ਕਨਾਲ\s*(\d+)\s*ਮਰਲਾ\s*\(?\s*(\d+)\s*\S*\s*(\d+)\s*\S*\s*(\d+(?:\.\d+)?)/;
 // after '... ਮਰਲਾ': '(4 ਹੈਕਟੇਅਰ 50 ਏਅਰ 21.28' -> hectare, are, optional centiare (strict: words between numbers)
-const HA = /ਮਰਲਾ\s*\(?\s*(?:q\s*)?(\d+)\s+\S+\s+(\d+)(?:\s+\S+\s+(\d+(?:\.\d+)?))?/;
+const HA = /ਮਰਲਾ(?:\s*\d+(?:\.\d+)?\s*ਬਿਸਵਾਂਸੀ)?\s*\(?\s*(?:q\s*)?(\d+)\s+\S+\s+(\d+)(?:\s+\S+\s+(\d+(?:\.\d+)?))?/;
 function parseTotal(t) {
   const k = t.match(TOTAL); if (!k) return null;
   const h = t.slice(k.index).match(HA);
-  if (!h) return [+k[1], +k[2], null, null];
+  const ma = +k[2] + bsi(k[3]);
+  if (!h) return [+k[1], ma, null, null];
   const base = (+h[1]) * 10000 + (+h[2]) * 100;
-  return [+k[1], +k[2], h[3] !== undefined ? base + parseFloat(h[3]) : null, base];
+  return [+k[1], ma, h[3] !== undefined ? base + parseFloat(h[3]) : null, base];
 }
-const KM_HA = /(\d+)\s*ਕਨਾ\S*\s*(\d+)\s*ਮਰ\S*(?:\s*\(?\s*(\d+)\s+\S+\s+(\d+)(?:\s+\S+\s+(\d+(?:\.\d+)?))?)?/;
+const KM_HA = /(\d+)\s*ਕਨਾ\S*\s*(\d+)\s*ਮਰ\S*(?:\s*(\d+(?:\.\d+)?)\s*ਬਿਸਵਾਂਸੀ)?(?:\s*\(?\s*(\d+)\s+\S+\s+(\d+)(?:\s+\S+\s+(\d+(?:\.\d+)?))?)?/;
 function parseKM(t) {
   const m = t.match(KM_HA); if (!m) return null;
-  const base = m[3] !== undefined ? (+m[3]) * 10000 + (+m[4]) * 100 : null;
-  return [+m[1], +m[2], base !== null && m[5] !== undefined ? base + parseFloat(m[5]) : null, base];
+  const base = m[4] !== undefined ? (+m[4]) * 10000 + (+m[5]) * 100 : null;
+  return [+m[1], +m[2] + bsi(m[3]), base !== null && m[6] !== undefined ? base + parseFloat(m[6]) : null, base];
 }
 const validKM = t => t && t[1] < 20 ? t : null;       // 20 marla = 1 kanal, so 'M' is always 0-19
 // text layer only (exact digits): a number can come in pieces ('ਰਕਬਾ 18 0 ਕਨਾਲ' = 180), and a few Fards print
@@ -358,9 +362,13 @@ function parseTotalText(t) {
 }
 // khatauni total in column 7: '19-15 (0-99-90.68)' -> [kanal, marla, m2 or null]
 function parseKtotal(t) {
-  const m = t.match(/(\d+)\s*-\s*(\d+)\s*\(\s*(\d+)\s*-\s*(\d+)\s*-\s*(\d+(?:\.\d+)?)/);
-  if (m) return [+m[1], +m[2], (+m[3]) * 10000 + (+m[4]) * 100 + parseFloat(m[5])];
-  const k = t.match(/^\D*(\d+)\s*-\s*(\d+)/); return k ? [+k[1], +k[2], null] : null;
+  const t0 = t;
+  t = t.replace(/(^|[^\d.])(\d(?: \d){1,4})(?=\s*-\s*\d)/g, (_, a, d) => a + d.replace(/ /g, ''));   // text layers can split digits: '1 9 5 -16' = 195-16
+  const split = t !== t0;                                                    // 4th value: the digits had to be joined
+  // bigha Fards with biswansi print '62-6-10.00 (5-25-44.66)' (bigha-biswa-biswansi)
+  const m = t.match(/(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+\.\d+))?\s*\(\s*(?:q\s*)?(\d+)\s*-\s*(\d+)\s*-\s*(\d+(?:\.\d+)?)/);   // stray 'q': '( q 1 - 17-19.91)'
+  if (m) return [+m[1], +m[2] + bsi(m[3]), (+m[4]) * 10000 + (+m[5]) * 100 + parseFloat(m[6]), split];
+  const k = t.match(/^\D*(\d+)\s*-\s*(\d+)/); return k ? [+k[1], +k[2], null, split] : null;
 }
 // group text-layer words into lines (digital PDFs)
 function textLines(words, x0, x1, y0, y1, tol = 6) {
@@ -592,8 +600,12 @@ async function scanPage(pg, { img, grid, words, hiImg, bigha }) {
     if (!t5.startsWith('ਕੁਲ') || mizanY.some(my => Math.abs(y5 - my) < 15) || !kitteAt(y5)) continue;
     const src = words ? textLines(words, ...cols[7], y5 - 2, y5 + 64).map(l => l.text).join(' ')
                       : withNext(lines[7].filter(([y]) => y >= y5 - 10), y5 - 10);
-    const kt = parseKtotal(src);
-    if (kt) events.push([pg, y5, 'ktotal', [kt[0], kt[1], !!words || (kt[2] !== null && agrees(kt[0] * 20 + kt[1], kt[2]))]]);
+    let kt = parseKtotal(src);
+    if (words && kt && kt[2] === null) {     // the hectare figure can wrap onto a 4th line: '1 2 5 -' '14 (0-' '23-' '77.53)'
+      const more = parseKtotal(textLines(words, ...cols[7], y5 - 2, y5 + 96).map(l => l.text).join(' '));
+      if (more && more[0] === kt[0] && more[1] === kt[1]) kt = more;
+    }
+    if (kt) events.push([pg, y5, 'ktotal', [kt[0], kt[1], !!words || (kt[2] !== null && agrees(kt[0] * 20 + kt[1], kt[2])), words ? kt[2] : null, words && kt[3]]]);
   }
   const col7 = words ? textLines(words, ...cols[7], top, bot).map(l => [l.y, l.text]) : lines[7];
   // a khasra row starts its own area in column 7 ('7-15'); a wrapped piece sits next to '(0-39-20.39)'
@@ -919,10 +931,13 @@ function build(events, scannedPages = new Set()) {
   for (const k of khewats) {
     k.unit = [...k.pages].some(p => bighaPages.has(p)) ? 'bigha' : 'kanal';
     unitM2 = k.unit === 'bigha' ? M2_PER_BISWA : M2_PER_MARLA;
-    const ks = k.ktotals.reduce((s, [a, b]) => s + a * 20 + b, 0);
-    k.ksum = k.ktotals.length ? [Math.floor(ks / 20), ks % 20] : null;
+    const ks = Math.round(k.ktotals.reduce((s, [a, b]) => s + a * 20 + b, 0) * 1e4) / 1e4;   // biswansi: fractions of a biswa
+    k.ksum = k.ktotals.length ? [Math.floor(ks / 20), Math.round((ks - 20 * Math.floor(ks / 20)) * 1e4) / 1e4] : null;
     // exact when every khatauni total is either from the text layer or confirmed by its hectare figure
     k.ksumExact = k.ktotals.length > 0 && k.ktotals.every(t => t[2]) && k.ktotals.length >= k.khatauni.length;
+    // text layer: a khatauni total printed with split digits whose own hectare figure disagrees is a Fard misprint
+    // (e.g. '1 9 5 -16 (0-54-63.26)'); other small hectare differences are left alone, as before
+    k.ktotalHaBad = k.ktotals.filter(t => t[4] && t[3] !== null && t[3] !== undefined && !agrees(t[0] * 20 + t[1], t[3]));
     // khewat total: its Kanal-Marla and hectare figures must agree
     if (k.total && k.total[4] !== null && k.total[4] !== undefined) {
       const [ka, ma, m2, exact, haAre] = k.total, marla = ka * 20 + ma;
@@ -934,7 +949,8 @@ function build(events, scannedPages = new Set()) {
         if (m2 !== null && agrees(d, m2) && sumOk) {
           k.totalNote = `total read as ${ka} K - ${ma} M, corrected to ${dk[0]} K - ${dk[1]} M from its hectare figure and the khatauni totals - check page ${k.totalPage}`;
           k.total = [dk[0], dk[1], m2, exact, haAre];
-        } else if (!(k.ksumExact && k.ksum[0] === ka && k.ksum[1] === ma)) {
+        // khatauni totals only vouch for the total when their own hectare figures agree ('125-14 (0-23-77.53)' repeats the misprint)
+        } else if (!(k.ksumExact && !k.ktotalHaBad.length && k.ksum[0] === ka && k.ksum[1] === ma)) {
           k.totalNote = (k.totalNote ? k.totalNote + '; ' : '') + (exact
             ? `total ${ka} K - ${ma} M does not match its hectare figure` + (m2 !== null && agrees(d, m2) ? ` (which gives ${dk[0]} K - ${dk[1]} M)` : '') + ` - check page ${k.totalPage}`
             : `total ${ka} K - ${ma} M could not be confirmed (its hectare figure reads differently on this scanned copy) - check page ${k.totalPage}`);
@@ -957,7 +973,8 @@ function build(events, scannedPages = new Set()) {
       // a role label printed after a share belongs to that entry: '1/4 ਹਿੱਸਾ ਮੁਰਤਹਿਨ <next name>'
       if (lead && owners.length) owners[owners.length - 1].role = lead;
       owners.push({ name: cleanName(body), share: frac(m[1], m[2]), shareTxt: `${m[1]}/${m[2]}`, page: pageOf(lastEnd),
-                    billaInner: BILLA.test(body), firstLead: owners.length ? null : lead });
+                    billaInner: BILLA.test(body), firstLead: owners.length ? null : lead,
+                    minus: /-\s*$/.test(raw) });     // 'ਬਿੱਲਾਰਾਹਿਨ -23/1140 ਹਿੱਸਾ': the Fard prints the share with a minus sign
       lastEnd = m.index + m[0].length;
     }
     let [restLead, restBody] = splitRole(text.slice(lastEnd));
@@ -1004,6 +1021,8 @@ export function khewatChecks(k) {
   if (k.numberNote) note(k.numberNote);
   if (k.remarksError) note(`the Fard could not print the remarks (column 8) on page ${k.remarksError} ("Error: Subreport could not be shown"): later changes or mortgages written there are not visible - download the Fard again to see them`);
   if (k.totalNote) chk(k.totalNote);
+  const minus = k.owners.filter(o => o.minus);
+  if (minus.length) chk(`the Fard prints ${minus.length} share${minus.length > 1 ? 's' : ''} with a minus sign (e.g. -${minus[0].shareTxt}, page ${minus[0].page}) - shown here without the sign; such shares cannot add up to 1 as printed - check with a patwari`);
   if (k.total && !k.totalNote && !k.totalFromSum && !k.ksumExact && k.ksum && k.khatauni.length && k.ktotals.length === k.khatauni.length
       && (k.ksum[0] !== k.total[0] || k.ksum[1] !== k.total[1]))
     chk(`total ${k.total[0]} K - ${k.total[1]} M could not be confirmed: its khatauni totals read as ${k.ksum[0]} K - ${k.ksum[1]} M on this scanned copy - check page ${k.totalPage}`);
@@ -1015,6 +1034,8 @@ export function khewatChecks(k) {
   if (!k.total && k.atEnd) chk(`the PDF ends before this khewat's total (page ${lastPg} is the last page) - part of the Fard seems to be missing`);
   else if (!k.total) chk(`total area not readable (page ${k.totalPage || '?'})`);
   else if (k.totalFromSum && !k.ksumExact) chk('no khewat total printed; used the khatauni totals read by OCR - check them');
+  else if (k.totalFromSum && k.ktotalHaBad && k.ktotalHaBad.length)
+    chk(`no khewat total printed; the khatauni total ${k.ktotalHaBad[0][0]}-${k.ktotalHaBad[0][1]} does not match its own hectare figure (${(k.ktotalHaBad[0][3] / 10000).toFixed(4)} ha) - the Fard's kanal-marla figures look misprinted; owners' land may be wrong - check page ${[...k.pages].sort((a, b) => a - b).join(', ')}`);
   else if (k.ksumExact && (k.ksum[0] !== k.total[0] || k.ksum[1] !== k.total[1]) && !k.totalFromSum)
     chk(`khatauni totals add up to ${k.ksum[0]} K - ${k.ksum[1]} M but the khewat total reads ${k.total[0]} K - ${k.total[1]} M - check page ${k.totalPage}`);
   const sg = k.scanned && k.owners.length && !one(k.shareSum) ? suggestShares(k) : null;
@@ -1041,8 +1062,10 @@ export const mutationNote = k => k.mutationPages.size ? 'Yes - page ' + [...k.mu
 export const mortgageMention = k => [...k.mortgagePages].sort((a, b) => a - b).join(', ');
 export function ownerLand(k, o) {
   if (!k.total) return null;
-  const tm = BigInt(k.total[0] * 20 + k.total[1]);
-  return [tm * o.share[0], o.share[1]];      // marla as a fraction
+  const t = k.total[0] * 20 + k.total[1];
+  if (Number.isInteger(t)) return [BigInt(t) * o.share[0], o.share[1]];      // marla as a fraction
+  const t2000 = BigInt(Math.round(t * 2000));                                 // biswansi (2 decimals): exact in 1/2000 biswa
+  return [t2000 * o.share[0], o.share[1] * 2000n];
 }
 
 // ---------------- main entry ----------------

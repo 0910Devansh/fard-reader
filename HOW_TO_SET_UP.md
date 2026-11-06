@@ -175,3 +175,26 @@ khewat could be split, merged into another or missed; every other khewat gives e
 - **A khewat heading split over two pages is joined.** When a khewat number is printed at the very bottom of a page
   ("723/") and its old number and owners at the top of the next ("651 ਮਿਨ ..."), 20.6 showed an empty khewat 723 and a
   wrong khewat 651. It is now one khewat, 723/651, with a note to check the page.
+
+## Version 20.8
+
+Tested on 153 Land Records against 20.7, with every khewat compared: 148 read exactly the same, and 5 changed only where
+intended.
+
+- **Bigha Fards with biswansi are read correctly.** Some Patiala Fards print totals as "62 ਬਿਘਾ 6 ਬਿਸਵਾ 10.00 ਬਿਸਵਾਂਸੀ"
+  (1 biswa = 20 biswansi), and some PDFs spell these words in garbled ways (ਸਬਿਵਾ, ਸਬਿਵਾਿੀ). 20.7 could read the total
+  wrong. For example, it read "862 bigha 6 biswa" instead of 62-6-10, which gave 179.6 acres instead of 12.98. The
+  biswansi are now included, and owners' land is worked out exactly.
+- **Khatauni totals with split digits.** Some PDFs store "195-16" as "1 9 5 -16". 20.7 read this as 5-16, which made a
+  khewat with no printed total far too small. The digits are now joined.
+- **A khatauni total that disagrees with its own hectare figure is flagged.** When a khewat has no total of its own and
+  the khatauni total does not match the hectare figure printed beside it, the Fard's figures look misprinted. The khewat
+  is now marked to check with a patwari.
+- **Shares printed with a minus sign are flagged.** Some Fards print a share like "ਬਿੱਲਾਰਾਹਿਨ -23/1140 ਹਿੱਸਾ". It is shown
+  without the sign, and the khewat is marked to check with a patwari, because such shares cannot add up to 1 as printed.
+- **Fix (6 Nov):** the first 20.8 build hid the "total does not match its hectare figure" warning on 5 Fards whose
+  misprinted kanal total was repeated in a split-digit khatauni total (for example, 200 K printed where the hectare figure
+  gives 5 K). The warning is back. This was tested on 93 Land Records: those 5 changed, and the other 88, including 10
+  unaffected controls, read exactly the same.
+- Known limit: a few Fards use the larger pakka bigha (3 times the kachha bigha). Their acres are shown too small, and
+  the khewat is marked "does not match its hectare figure".

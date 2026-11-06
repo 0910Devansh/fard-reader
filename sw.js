@@ -1,5 +1,5 @@
 // Offline support: every file the app needs is stored on the phone at install.
-const CACHE = 'fard-reader-v20.7';
+const CACHE = 'fard-reader-v20.8';
 const FILES = [
  "./",
  "index.html",
